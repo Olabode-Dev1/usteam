@@ -67,8 +67,8 @@ pipeline {
             steps {
                 sshagent (['ansible-key']) {
                       // Install Docker collection first                     
-                      sh 'ssh -t -t ec2-user@13.38.77.137 -o strictHostKeyChecking=no "ansible-galaxy collection install community.docker"'
-                      sh 'ssh -t -t ec2-user@13.38.77.137 -o strictHostKeyChecking=no "cd /etc/ansible && ansible-playbook /opt/docker/docker-image.yml"'
+                      sh 'ssh -t -t ec2-user@13.38.25.138 -o strictHostKeyChecking=no "ansible-galaxy collection install community.docker"'
+                      sh 'ssh -t -t ec2-user@13.38.25.138 -o strictHostKeyChecking=no "cd /etc/ansible && ansible-playbook /opt/docker/docker-image.yml"'
                   }
               }
         }                
@@ -80,8 +80,8 @@ pipeline {
         stage('Deploy to stage') {
             steps {
                 sshagent (['ansible-key']) {
-                    sh "ssh -t -t ec2-user@13.38.77.137 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml\""
-                    sh "ssh -t -t ec2-user@13.38.77.137 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml\""
+                    sh "ssh -t -t ec2-user@13.38.25.138 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml\""
+                    sh "ssh -t -t ec2-user@13.38.25.138 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml\""
                 }
             }
         }
@@ -112,8 +112,8 @@ pipeline {
         stage('Deploy to Prod') {
             steps {
                 sshagent (['ansible-key']) {
-                    sh "ssh -t -t ec2-user@13.38.77.137 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml\""
-                    sh "ssh -t -t ec2-user@13.38.77.137 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml\""
+                    sh "ssh -t -t ec2-user@13.38.25.138 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml\""
+                    sh "ssh -t -t ec2-user@13.38.25.138 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml\""
                 }
             }
         }
