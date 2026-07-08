@@ -86,7 +86,7 @@ pipeline {
             steps {
                 sh "sleep 90"
                 script {
-                    def response = sh(script: "curl -s -o /dev/null -w \"%{http_code}\" https://stage.everythingops.io/", returnStdout: true).trim()
+                    def response = sh(script: "curl -s -o /dev/null -w \"%{http_code}\" https://www.everythingops.io/", returnStdout: true).trim()
 
                     if (response == "200") {
                         slackSend(color: 'good', message: "The stage petclinic Java application is up and running with HTTP status code ${response}.", tokenCredentialId: 'slack-cred')
