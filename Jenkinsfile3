@@ -1,122 +1,122 @@
 pipeline {
     agent any
+
     stages {
-//        stage('Code Checkout') {
-//            steps {
-//                git branch: 'main',
-//                credentialsId: 'git-cred',
-//                url: 'https://github.com/CloudHight/usteam.git'
-//            }
-//        }
         stage('Code Analysis') {
             steps {
-               withSonarQubeEnv('sonarqube') {
-                  sh "mvn sonar:sonar"
-               }
+                withSonarQubeEnv('sonarqube') {
+                    sh "mvn sonar:sonar"
+                }
             }
         }
+
         stage("Quality Gate") {
             steps {
-              timeout(time: 2, unit: 'MINUTES') {
-                waitForQualityGate abortPipeline: true
-              }
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
-         stage('Dependency Check') {
-    steps {
-        withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
-            dependencyCheck additionalArguments: "--scan ./ --disableYarnAudit --disableNodeAudit --nvdApiKey ${env.NVD_API_KEY}", odcInstallation: 'DP-Check'
-            dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-        }
-    }
-}
 
-//        stage('Checkov Scan') {
-//            steps {
-//                sh '''
-//                    # Ensure correct PATH for Checkov command
-//                    export PATH=$PATH:$(python3 -m site --user-base)/bin
-//
-//                    # Run Checkov scan on the repository
-//                    checkov -d . --output cli || true
-//                '''
-//            }
-//        }
+        stage('Dependency Check') {
+            steps {
+                withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
+                    dependencyCheck additionalArguments: "--scan ./ --disableYarnAudit --disableNodeAudit --nvdApiKey ${env.NVD_API_KEY}", odcInstallation: 'DP-Check'
+                    dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+                }
+            }
+        }
+
         stage('Build Artifact') {
             steps {
                 sh 'mvn -f pom.xml clean package -DskipTests -Dcheckstyle.skip'
             }
         }
+
         stage('Push Artifact to Nexus Repo') {
             steps {
-                nexusArtifactUploader artifacts: [[artifactId: 'spring-petclinic',
-                classifier: '',
-                file: 'target/spring-petclinic-2.4.2.war',
-                type: 'war']],
-                credentialsId: 'nexus-cred',
+                nexusArtifactUploader artifacts: [[
+                    artifactId: 'spring-petclinic',
+                    classifier: '',
+                    file: 'target/spring-petclinic-2.4.2.war',
+                    type: 'war'
+                ]],
+                credentialsId: 'nexus-creds',
                 groupId: 'Petclinic',
-                nexusUrl: 'nexus.everythingops.io',
+                nexusUrl: '15.188.144.219:8081',
                 nexusVersion: 'nexus3',
-                protocol: 'https',
+                protocol: 'http',
                 repository: 'nexus-repo',
                 version: '1.0'
             }
         }
-        stage('Build docker image') {
+
+        stage('Build Docker Image with Ansible') {
             steps {
-                sshagent (['ansible-key']) {
-                      // Install Docker collection first                     
-                      sh 'ssh -t -t ec2-user@10.0.3.19 -o strictHostKeyChecking=no "ansible-galaxy collection install community.docker"'
-                      sh 'ssh -t -t ec2-user@10.0.3.19 -o strictHostKeyChecking=no "cd /etc/ansible && ansible-playbook /opt/docker/docker-image.yml"'
-                  }
-              }
-        }                
-        stage('Trivy image scan') {
-            steps {
-                sh "trivy image cloudhight/testapp > trivyfs.txt"
-            }             
-        }
-        stage('Deploy to stage') {
-            steps {
-                sshagent (['ansible-key']) {
-                    sh "ssh -t -t ec2-user@10.0.3.19 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml\""
-                    sh "ssh -t -t ec2-user@10.0.3.19 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml\""
+                sshagent(['ansible-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ec2-user@13.38.17.109 \
+                        "ansible-galaxy collection install community.docker && cd /etc/ansible && ansible-playbook /opt/docker/docker-image.yml"
+                    '''
                 }
             }
         }
-        
-        stage('check website availability') {
+
+        stage('Trivy Image Scan') {
             steps {
-                 sh "sleep 90"
-                 sh "curl -s -o /dev/null -w \"%{http_code}\" https://stage.everythingops.io/"
+                sh "trivy image cloudhight/testapp:latest > trivyimage.txt"
+            }
+        }
+
+        stage('Deploy to Stage') {
+            steps {
+                sshagent(['ansible-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ec2-user@13.38.17.109 \
+                        "cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml"
+
+                        ssh -o StrictHostKeyChecking=no ec2-user@13.38.17.109 \
+                        "cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml"
+                    '''
+                }
+            }
+        }
+
+        stage('Check Website Availability') {
+            steps {
+                sh "sleep 90"
                 script {
                     def response = sh(script: "curl -s -o /dev/null -w \"%{http_code}\" https://stage.everythingops.io/", returnStdout: true).trim()
+
                     if (response == "200") {
-                        slackSend(color: 'good', message: "The stage petclinic java application is up and running with HTTP status code ${response}.", tokenCredentialId: 'slack-cred')
+                        slackSend(color: 'good', message: "The stage petclinic Java application is up and running with HTTP status code ${response}.", tokenCredentialId: 'slack-cred')
                     } else {
-                        slackSend(color: 'danger', message: "The stage petclinic java application appears to be down with HTTP status code ${response}.", tokenCredentialId: 'slack-cred')
+                        slackSend(color: 'danger', message: "The stage petclinic Java application appears to be down with HTTP status code ${response}.", tokenCredentialId: 'slack-cred')
                     }
                 }
             }
         }
+
         stage('Request for Approval') {
             steps {
                 timeout(activity: true, time: 10) {
-                    input message: 'Needs Approval ', submitter: 'admin'
+                    input message: 'Needs Approval', submitter: 'admin'
                 }
             }
         }
-
 
         stage('Deploy to Prod') {
             steps {
-                sshagent (['ansible-key']) {
-                    sh "ssh -t -t ec2-user@10.0.3.19 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml\""
-                    sh "ssh -t -t ec2-user@10.0.3.19 -o strictHostKeyChecking=no \"cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml\""
+                sshagent(['ansible-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ec2-user@13.38.17.109 \
+                        "cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml"
+
+                        ssh -o StrictHostKeyChecking=no ec2-user@13.38.17.109 \
+                        "cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml"
+                    '''
                 }
             }
         }
-
     }
-
 }
