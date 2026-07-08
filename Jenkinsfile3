@@ -64,7 +64,7 @@ pipeline {
 
         stage('Trivy Image Scan') {
             steps {
-                sh "trivy image --scanners vuln --skip-java-db-update olabode111/testapp:latest > trivyimage.txt"
+                trivy image --scanners vuln --pkg-types os olabode111/testapp:latest > trivyimage.txt"
             }
         }
 
