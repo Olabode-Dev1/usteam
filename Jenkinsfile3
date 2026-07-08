@@ -64,7 +64,7 @@ pipeline {
 
         stage('Trivy Image Scan') {
             steps {
-                sh "trivy image cloudhight/testapp:latest > trivyimage.txt"
+                sh "trivy image olabode111/testapp:latest > trivyimage.txt"
             }
         }
 
