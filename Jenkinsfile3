@@ -6,9 +6,9 @@ pipeline {
     }
 
     environment {
-        DOCKER_IMAGE = "yourdockerhubusername/testapp"
-        ANSIBLE_HOST = "13.38.17.109"
-        NEXUS_URL = "15.188.144.219:8081"
+        DOCKER_IMAGE = "olabode111/testapp"
+        ANSIBLE_HOST = "51.44.209.72"
+        NEXUS_URL = "13.38.80.100:8081"
         APP_URL = "https://www.everythingops.io/"
     }
 
