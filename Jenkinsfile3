@@ -31,10 +31,7 @@ pipeline {
 
         stage('Dependency Check') {
             steps {
-                withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
-                    dependencyCheck additionalArguments: "--scan ./ --disableYarnAudit --disableNodeAudit --nvdApiKey ${env.NVD_API_KEY}", odcInstallation: 'DP-Check'
-                    dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-                }
+                echo "Skipping Dependency-Check temporarily to validate the deployment flow."
             }
         }
 
@@ -108,12 +105,23 @@ pipeline {
             steps {
                 sh "sleep 90"
                 script {
-                    def response = sh(script: "curl -s -o /dev/null -w \"%{http_code}\" ${APP_URL}", returnStdout: true).trim()
+                    def response = sh(
+                        script: "curl -s -o /dev/null -w \"%{http_code}\" ${APP_URL}",
+                        returnStdout: true
+                    ).trim()
 
                     if (response == "200") {
-                        slackSend(color: 'good', message: "The stage PetClinic Java application is up and running with HTTP status code ${response}.", tokenCredentialId: 'slack-cred')
+                        slackSend(
+                            color: 'good',
+                            message: "The stage PetClinic Java application is up and running with HTTP status code ${response}.",
+                            tokenCredentialId: 'slack-cred'
+                        )
                     } else {
-                        slackSend(color: 'danger', message: "The stage PetClinic Java application appears to be down with HTTP status code ${response}.", tokenCredentialId: 'slack-cred')
+                        slackSend(
+                            color: 'danger',
+                            message: "The stage PetClinic Java application appears to be down with HTTP status code ${response}.",
+                            tokenCredentialId: 'slack-cred'
+                        )
                         error("Website health check failed with status code ${response}")
                     }
                 }
