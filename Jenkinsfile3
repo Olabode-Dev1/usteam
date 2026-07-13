@@ -10,7 +10,7 @@ pipeline {
         ANSIBLE_HOST = "51.44.243.242"
         NEXUS_URL = "15.237.95.21:8081"
         APP_URL = "https://www.everythingops.io/"
-        SSH_OPTS = "-o StrictHostKeyChecking=no -o PubkeyAuthentication=yes -o PreferredAuthentications=publickey -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa"
+        SSH_OPTS = "-o StrictHostKeyChecking=no -o IdentitiesOnly=yes -o PubkeyAuthentication=unbound"
     }
 
     stages {
@@ -62,37 +62,42 @@ pipeline {
 
         stage('Test Jenkins SSH Key') {
             steps {
-                sshagent(['ansible-key']) {
-                    sh """
-                        echo "Loaded SSH keys in Jenkins:"
-                        ssh-add -l -E sha256
-
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'ansible-key',
+                    keyFileVariable: 'ANSIBLE_KEY',
+                    usernameVariable: 'ANSIBLE_USER'
+                )]) {
+                    sh '''
                         echo "Testing SSH connection to Ansible server:"
-                        ssh -vvv ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} "hostname && whoami"
-                    """
+                        ssh -vvv -i "$ANSIBLE_KEY" $SSH_OPTS "$ANSIBLE_USER@$ANSIBLE_HOST" "hostname && whoami"
+                    '''
                 }
             }
         }
 
         stage('Build Docker Image with Ansible') {
             steps {
-                sshagent(['ansible-key']) {
-                    sh """
-                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'ansible-key',
+                    keyFileVariable: 'ANSIBLE_KEY',
+                    usernameVariable: 'ANSIBLE_USER'
+                )]) {
+                    sh '''
+                        ssh -i "$ANSIBLE_KEY" $SSH_OPTS "$ANSIBLE_USER@$ANSIBLE_HOST" \
                         "ansible-galaxy collection install community.docker && cd /etc/ansible && ansible-playbook /opt/docker/docker-image.yml"
-                    """
+                    '''
                 }
             }
         }
 
         stage('Trivy Image Scan') {
             steps {
-                sh """
+                sh '''
                     trivy image \
                     --scanners vuln,secret \
                     --timeout 15m \
-                    ${DOCKER_IMAGE}:latest > trivyimage.txt
-                """
+                    "$DOCKER_IMAGE:latest" > trivyimage.txt
+                '''
             }
         }
 
@@ -104,14 +109,18 @@ pipeline {
 
         stage('Deploy to Stage') {
             steps {
-                sshagent(['ansible-key']) {
-                    sh """
-                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'ansible-key',
+                    keyFileVariable: 'ANSIBLE_KEY',
+                    usernameVariable: 'ANSIBLE_USER'
+                )]) {
+                    sh '''
+                        ssh -i "$ANSIBLE_KEY" $SSH_OPTS "$ANSIBLE_USER@$ANSIBLE_HOST" \
                         "cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml"
 
-                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
+                        ssh -i "$ANSIBLE_KEY" $SSH_OPTS "$ANSIBLE_USER@$ANSIBLE_HOST" \
                         "cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml"
-                    """
+                    '''
                 }
             }
         }
@@ -153,14 +162,18 @@ pipeline {
 
         stage('Deploy to Prod') {
             steps {
-                sshagent(['ansible-key']) {
-                    sh """
-                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
+                withCredentials([sshUserPrivateKey(
+                    credentialsId: 'ansible-key',
+                    keyFileVariable: 'ANSIBLE_KEY',
+                    usernameVariable: 'ANSIBLE_USER'
+                )]) {
+                    sh '''
+                        ssh -i "$ANSIBLE_KEY" $SSH_OPTS "$ANSIBLE_USER@$ANSIBLE_HOST" \
                         "cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml"
 
-                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
+                        ssh -i "$ANSIBLE_KEY" $SSH_OPTS "$ANSIBLE_USER@$ANSIBLE_HOST" \
                         "cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml"
-                    """
+                    '''
                 }
             }
         }
