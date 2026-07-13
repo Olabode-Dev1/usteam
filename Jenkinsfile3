@@ -10,6 +10,7 @@ pipeline {
         ANSIBLE_HOST = "51.44.243.242"
         NEXUS_URL = "15.237.95.21:8081"
         APP_URL = "https://www.everythingops.io/"
+        SSH_OPTS = "-o StrictHostKeyChecking=no -o PubkeyAuthentication=yes -o PreferredAuthentications=publickey -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa"
     }
 
     stages {
@@ -67,7 +68,7 @@ pipeline {
                         ssh-add -l -E sha256
 
                         echo "Testing SSH connection to Ansible server:"
-                        ssh -vvv -o StrictHostKeyChecking=no ec2-user@${ANSIBLE_HOST} "hostname && whoami"
+                        ssh -vvv ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} "hostname && whoami"
                     """
                 }
             }
@@ -77,7 +78,7 @@ pipeline {
             steps {
                 sshagent(['ansible-key']) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ec2-user@${ANSIBLE_HOST} \
+                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
                         "ansible-galaxy collection install community.docker && cd /etc/ansible && ansible-playbook /opt/docker/docker-image.yml"
                     """
                 }
@@ -105,10 +106,10 @@ pipeline {
             steps {
                 sshagent(['ansible-key']) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ec2-user@${ANSIBLE_HOST} \
+                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
                         "cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml"
 
-                        ssh -o StrictHostKeyChecking=no ec2-user@${ANSIBLE_HOST} \
+                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
                         "cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml"
                     """
                 }
@@ -154,10 +155,10 @@ pipeline {
             steps {
                 sshagent(['ansible-key']) {
                     sh """
-                        ssh -o StrictHostKeyChecking=no ec2-user@${ANSIBLE_HOST} \
+                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
                         "cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml"
 
-                        ssh -o StrictHostKeyChecking=no ec2-user@${ANSIBLE_HOST} \
+                        ssh ${SSH_OPTS} ec2-user@${ANSIBLE_HOST} \
                         "cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml"
                     """
                 }
