@@ -59,6 +59,20 @@ pipeline {
             }
         }
 
+        stage('Test Jenkins SSH Key') {
+            steps {
+                sshagent(['ansible-key']) {
+                    sh """
+                        echo "Loaded SSH keys in Jenkins:"
+                        ssh-add -l -E sha256
+
+                        echo "Testing SSH connection to Ansible server:"
+                        ssh -vvv -o StrictHostKeyChecking=no ec2-user@${ANSIBLE_HOST} "hostname && whoami"
+                    """
+                }
+            }
+        }
+
         stage('Build Docker Image with Ansible') {
             steps {
                 sshagent(['ansible-key']) {
