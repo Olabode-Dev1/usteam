@@ -29,9 +29,13 @@ jobs:
         run: |
           mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar \
             -Dsonar.host.url="${{ secrets.SONAR_HOST_URL }}" \
-            -Dsonar.token="${{ secrets.SONAR_TOKEN }}" \
+            -Dsonar.login="${{ secrets.SONAR_TOKEN }}" \
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=600
+
+      - name: Dependency Check
+        run: |
+          echo "Skipping Dependency-Check temporarily to validate the GitHub Actions deployment flow."
 
       - name: Dependency Check
         run: |
