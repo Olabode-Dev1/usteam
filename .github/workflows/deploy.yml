@@ -1,1 +1,4 @@
+name: Pet Adoption CI/CD
 
+on:
+  workflow_dispatch:
