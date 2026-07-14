@@ -60,8 +60,8 @@ jobs:
             -o StrictHostKeyChecking=no \
             -o IdentitiesOnly=yes \
             -o PreferredAuthentications=publickey \
-            -o PubkeyAuthentication=unbound \
-            "${{ secrets.ANSIBLE_USER }}@${{ secrets.ANSIBLE_HOST }}" \
+            -o PubkeyAuthentication=yes \
+            "ec2-user@${{ secrets.ANSIBLE_HOST }}" \
             "hostname && whoami"
 
       - name: Build Docker image with Ansible
@@ -69,8 +69,8 @@ jobs:
           ssh -i ~/.ssh/ansible_key \
             -o StrictHostKeyChecking=no \
             -o IdentitiesOnly=yes \
-            -o PubkeyAuthentication=unbound \
-            "${{ secrets.ANSIBLE_USER }}@${{ secrets.ANSIBLE_HOST }}" \
+            -o PubkeyAuthentication=yes \
+            "ec2-user@${{ secrets.ANSIBLE_HOST }}" \
             "ansible-galaxy collection install community.docker && cd /etc/ansible && ansible-playbook /opt/docker/docker-image.yml"
 
       - name: Run Trivy image scan
@@ -94,15 +94,15 @@ jobs:
           ssh -i ~/.ssh/ansible_key \
             -o StrictHostKeyChecking=no \
             -o IdentitiesOnly=yes \
-            -o PubkeyAuthentication=unbound \
-            "${{ secrets.ANSIBLE_USER }}@${{ secrets.ANSIBLE_HOST }}" \
+            -o PubkeyAuthentication=yes \
+            "ec2-user@${{ secrets.ANSIBLE_HOST }}" \
             "cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml"
 
           ssh -i ~/.ssh/ansible_key \
             -o StrictHostKeyChecking=no \
             -o IdentitiesOnly=yes \
-            -o PubkeyAuthentication=unbound \
-            "${{ secrets.ANSIBLE_USER }}@${{ secrets.ANSIBLE_HOST }}" \
+            -o PubkeyAuthentication=yes \
+            "ec2-user@${{ secrets.ANSIBLE_HOST }}" \
             "cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml"
 
       - name: Check website availability
@@ -141,13 +141,13 @@ jobs:
           ssh -i ~/.ssh/ansible_key \
             -o StrictHostKeyChecking=no \
             -o IdentitiesOnly=yes \
-            -o PubkeyAuthentication=unbound \
-            "${{ secrets.ANSIBLE_USER }}@${{ secrets.ANSIBLE_HOST }}" \
+            -o PubkeyAuthentication=yes \
+            "ec2-user@${{ secrets.ANSIBLE_HOST }}" \
             "cd /etc/ansible && ansible-playbook /opt/docker/docker-container.yml"
 
           ssh -i ~/.ssh/ansible_key \
             -o StrictHostKeyChecking=no \
             -o IdentitiesOnly=yes \
-            -o PubkeyAuthentication=unbound \
-            "${{ secrets.ANSIBLE_USER }}@${{ secrets.ANSIBLE_HOST }}" \
+            -o PubkeyAuthentication=yes \
+            "ec2-user@${{ secrets.ANSIBLE_HOST }}" \
             "cd /etc/ansible && ansible-playbook /opt/docker/newrelic-container.yml"
