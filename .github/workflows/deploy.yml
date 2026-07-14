@@ -37,10 +37,6 @@ jobs:
         run: |
           echo "Skipping Dependency-Check temporarily to validate the GitHub Actions deployment flow."
 
-      - name: Dependency Check
-        run: |
-          echo "Skipping Dependency-Check temporarily to validate the GitHub Actions deployment flow."
-
       - name: Build WAR artifact
         run: |
           mvn -f pom.xml clean package -DskipTests -Dcheckstyle.skip
@@ -54,8 +50,19 @@ jobs:
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.ANSIBLE_SSH_KEY }}" > ~/.ssh/ansible_key
+          printf '%s\n' "${{ secrets.ANSIBLE_SSH_KEY }}" > ~/.ssh/ansible_key
           chmod 600 ~/.ssh/ansible_key
+          ssh-keygen -y -f ~/.ssh/ansible_key | ssh-keygen -lf - -E sha256
+
+      - name: Test SSH to Ansible
+        run: |
+          ssh -vvv -i ~/.ssh/ansible_key \
+            -o StrictHostKeyChecking=no \
+            -o IdentitiesOnly=yes \
+            -o PreferredAuthentications=publickey \
+            -o PubkeyAuthentication=unbound \
+            "${{ secrets.ANSIBLE_USER }}@${{ secrets.ANSIBLE_HOST }}" \
+            "hostname && whoami"
 
       - name: Build Docker image with Ansible
         run: |
@@ -125,8 +132,9 @@ jobs:
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.ANSIBLE_SSH_KEY }}" > ~/.ssh/ansible_key
+          printf '%s\n' "${{ secrets.ANSIBLE_SSH_KEY }}" > ~/.ssh/ansible_key
           chmod 600 ~/.ssh/ansible_key
+          ssh-keygen -y -f ~/.ssh/ansible_key | ssh-keygen -lf - -E sha256
 
       - name: Deploy to production
         run: |
