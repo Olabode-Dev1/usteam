@@ -54,22 +54,22 @@ jobs:
           chmod 600 ~/.ssh/ansible_key
           ssh-keygen -y -f ~/.ssh/ansible_key | ssh-keygen -lf - -E sha256
 
-      - name: Test SSH to Ansible
-        run: |
+           - name: Test SSH to Ansible
+              run: |
           ssh -vvv -i ~/.ssh/ansible_key \
             -o StrictHostKeyChecking=no \
             -o IdentitiesOnly=yes \
             -o PreferredAuthentications=publickey \
-            -o PubkeyAuthentication=yes \
+            -o PubkeyAuthentication=unbound \
             "ec2-user@${{ secrets.ANSIBLE_HOST }}" \
             "hostname && whoami"
 
-      - name: Build Docker image with Ansible
-        run: |
+            - name: Build Docker image with Ansible
+              run: |
           ssh -i ~/.ssh/ansible_key \
             -o StrictHostKeyChecking=no \
             -o IdentitiesOnly=yes \
-            -o PubkeyAuthentication=yes \
+            -o PubkeyAuthentication=unbound \
             "ec2-user@${{ secrets.ANSIBLE_HOST }}" \
             "ansible-galaxy collection install community.docker && cd /etc/ansible && ansible-playbook /opt/docker/docker-image.yml"
 
