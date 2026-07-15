@@ -35,7 +35,7 @@ jobs:
 
       - name: Dependency Check
         run: |
-          echo "Skipping Dependency-Check temporarily to validate the GitHub Actions deployment flow."
+          mvn -B org.owasp:dependency-check-maven:12.2.2:check
 
       - name: Build WAR artifact
         run: |
