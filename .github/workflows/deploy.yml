@@ -33,10 +33,10 @@ jobs:
             -Dsonar.qualitygate.wait=true \
             -Dsonar.qualitygate.timeout=600
 
-      - name: Dependency Check
-        run: |
-          mvn -B org.owasp:dependency-check-maven:12.2.2:check
-
+          - name: Dependency Check
+            run: |
+              mvn -B org.owasp:dependency-check-maven:12.2.2:check \
+            -DnvdApiKey="${{ secrets.NVD_API_KEY }}"
       - name: Build WAR artifact
         run: |
           mvn -f pom.xml clean package -DskipTests -Dcheckstyle.skip
