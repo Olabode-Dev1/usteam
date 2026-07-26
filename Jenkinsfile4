@@ -1,0 +1,210 @@
+pipeline {
+    agent any
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '5'))
+    }
+
+    environment {
+        DOCKER_IMAGE = "olabode111/testapp"
+        ANSIBLE_HOST = "51.44.186.184"
+        NEXUS_URL = "35.180.38.29:8081"
+        APP_URL = "https://www.everythingops.io/"
+        SSH_OPTS = "-o StrictHostKeyChecking=no -o IdentitiesOnly=yes -o PubkeyAuthentication=unbound"
+    }
+
+    stages {
+        stage('Build and Code Analysis') {
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    sh '''
+                        mvn -f pom.xml clean verify \
+                            -DskipTests \
+                            -Dcheckstyle.skip \
+                            org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Dependency Check') {
+            steps {
+                // Two separate Jenkins entries intentionally share this name:
+                // the tool installation and the Secret Text NVD credential.
+                dependencyCheck(
+                    additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit',
+                    nvdCredentialsId: 'DP-Check',
+                    odcInstallation: 'DP-Check',
+                    stopBuild: true
+                )
+
+                dependencyCheckPublisher(
+                    pattern: '**/dependency-check-report.xml'
+                )
+            }
+        }
+
+        stage('Push Artifact to Nexus Repo') {
+            steps {
+                nexusArtifactUploader(
+                    artifacts: [[
+                        artifactId: 'spring-petclinic',
+                        classifier: '',
+                        file: 'target/spring-petclinic-2.4.2.war',
+                        type: 'war'
+                    ]],
+                    credentialsId: 'nexus-creds',
+                    groupId: 'Petclinic',
+                    nexusUrl: "${NEXUS_URL}",
+                    nexusVersion: 'nexus3',
+                    protocol: 'http',
+                    repository: 'nexus-repo',
+                    version: '1.0'
+                )
+            }
+        }
+
+        stage('Test Jenkins SSH Key') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ansible-key',
+                        keyFileVariable: 'ANSIBLE_KEY',
+                        usernameVariable: 'ANSIBLE_USER'
+                    )
+                ]) {
+                    sh '''
+                        echo "Testing SSH connection to Ansible server:"
+
+                        ssh -vvv \
+                            -i "$ANSIBLE_KEY" \
+                            $SSH_OPTS \
+                            "$ANSIBLE_USER@$ANSIBLE_HOST" \
+                            "hostname && whoami"
+                    '''
+                }
+            }
+        }
+
+        stage('Build Docker Image with Ansible') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ansible-key',
+                        keyFileVariable: 'ANSIBLE_KEY',
+                        usernameVariable: 'ANSIBLE_USER'
+                    )
+                ]) {
+                    sh '''
+                        ssh \
+                            -i "$ANSIBLE_KEY" \
+                            $SSH_OPTS \
+                            "$ANSIBLE_USER@$ANSIBLE_HOST" \
+                            "ansible-galaxy collection install community.docker && \
+                             cd /etc/ansible && \
+                             ansible-playbook /opt/docker/docker-image.yml"
+                    '''
+                }
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh '''
+                    trivy image \
+                        --scanners vuln,secret \
+                        --timeout 15m \
+                        "$DOCKER_IMAGE:latest" \
+                        > trivyimage.txt
+                '''
+            }
+        }
+
+        stage('Archive Trivy Report') {
+            steps {
+                archiveArtifacts(
+                    artifacts: 'trivyimage.txt',
+                    fingerprint: true
+                )
+            }
+        }
+
+        stage('Deploy Application') {
+            steps {
+                withCredentials([
+                    sshUserPrivateKey(
+                        credentialsId: 'ansible-key',
+                        keyFileVariable: 'ANSIBLE_KEY',
+                        usernameVariable: 'ANSIBLE_USER'
+                    )
+                ]) {
+                    sh '''
+                        ssh \
+                            -i "$ANSIBLE_KEY" \
+                            $SSH_OPTS \
+                            "$ANSIBLE_USER@$ANSIBLE_HOST" \
+                            "cd /etc/ansible && \
+                             ansible-playbook /opt/docker/docker-container.yml"
+
+                        ssh \
+                            -i "$ANSIBLE_KEY" \
+                            $SSH_OPTS \
+                            "$ANSIBLE_USER@$ANSIBLE_HOST" \
+                            "cd /etc/ansible && \
+                             ansible-playbook /opt/docker/newrelic-container.yml"
+                    '''
+                }
+            }
+        }
+
+        stage('Check Website Availability') {
+            steps {
+                sh 'sleep 90'
+
+                script {
+                    def response = sh(
+                        script: """
+                            curl -s \
+                                -o /dev/null \
+                                -w "%{http_code}" \
+                                "${APP_URL}"
+                        """,
+                        returnStdout: true
+                    ).trim()
+
+                    if (response == '200') {
+                        slackSend(
+                            color: 'good',
+                            message: "The PetClinic Java application is up and running with HTTP status code ${response}.",
+                            tokenCredentialId: 'slack-cred'
+                        )
+                    } else {
+                        slackSend(
+                            color: 'danger',
+                            message: "The PetClinic Java application appears to be down with HTTP status code ${response}.",
+                            tokenCredentialId: 'slack-cred'
+                        )
+
+                        error(
+                            "Website health check failed with status code ${response}"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
