@@ -7,8 +7,8 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "olabode111/testapp"
-        ANSIBLE_HOST = "51.44.186.184"
-        NEXUS_URL = "35.180.38.29:8081"
+        ANSIBLE_HOST = "15.224.17.232"
+        NEXUS_URL = "13.38.77.120:8081"
         APP_URL = "https://www.everythingops.io/"
         SSH_OPTS = "-o StrictHostKeyChecking=no -o IdentitiesOnly=yes -o PubkeyAuthentication=unbound"
     }
